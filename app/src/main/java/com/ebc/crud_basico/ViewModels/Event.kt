@@ -27,4 +27,6 @@ sealed class Event {
     // Evento para cargar una nota desde la BD (por ejemplo, al abrir pantalla de edición).
     // También recibe un id opcional.
     data class Load(val id: Int?): Event()
+
+    data class SetImagePath(val imagePath: String?): Event()
 }

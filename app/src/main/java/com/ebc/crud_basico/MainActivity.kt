@@ -2,22 +2,34 @@ package com.ebc.crud_basico
 
 import android.annotation.SuppressLint
 import android.app.Application
+import android.content.Context
+import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
@@ -37,11 +49,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
@@ -58,6 +75,8 @@ import com.ebc.crud_basico.db.model.Note
 import com.ebc.crud_basico.ui.theme.CrudbasicoTheme
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
 
 // Activity principal de la app. Es el punto de entrada en Android.
 class MainActivity : ComponentActivity() {
@@ -164,6 +183,7 @@ fun CrudScreenSetup(viewModel: NoteViewModel) {
                 is Event.Load -> TODO()
                 Event.OpenDialog -> TODO()
                 is Event.SetText -> TODO()
+                is Event.SetImagePath -> TODO()
             }
         }
     }
@@ -195,7 +215,8 @@ fun CrudScreenSetup(viewModel: NoteViewModel) {
             allNotes = allNotes,
             openDialog = viewModel.openDialog,
             text = viewModel.text.value.text,
-            onEvent = { viewModel.onEvent(it) }
+            onEvent = { viewModel.onEvent(it) },
+            imagePath = viewModel.imagePath.value.path
         )
     }
 
@@ -209,6 +230,7 @@ fun CrudScreen(
     openDialog: Boolean,
     text: String,
     onEvent: (Event)-> Unit,
+    imagePath: String?,
 ) {
     // Contenedor principal de la pantalla.
     Box(modifier = Modifier.fillMaxSize().padding(20.dp)) {
@@ -240,6 +262,7 @@ fun CrudScreen(
                     leadingContent = {
                         // Botón de edición.
                         IconButton(onClick = {
+                            println("Nota ID: " + it.id + " " + it.imagePath)
                             onEvent(Event.Load(it.id))
                         }){
                             Icon( Icons.Rounded.Edit, contentDescription = null)
@@ -253,17 +276,38 @@ fun CrudScreen(
     }
 
     // Diálogo de edición/creación de nota.
-    EditDialog(openDialog = openDialog, text = text, onEvent = onEvent)
+    EditDialog(openDialog = openDialog, text = text, onEvent = onEvent, imagePath = imagePath)
 }
 
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun EditDialog(openDialog: Boolean, text: String, onEvent: (Event)-> Unit){
+fun EditDialog(openDialog: Boolean, text: String, onEvent: (Event)-> Unit, imagePath: String?){
 
     //val keyboardController = LocalSoftwareKeyboardController.current
 
+    //Imagenes
+    // Launcher para seleccionar imagen
+    var imagePathDialog by remember { mutableStateOf<String?>(null) }
+    imagePathDialog = imagePath
+    val context = LocalContext.current
+    val imagePickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetContent()
+        ) { uri: Uri? ->
+            uri?.let {
+                val path = saveImageToInternalStorage(context, it)
+                if (path != null) {
+                    imagePathDialog = path
+
+                    onEvent(Event.SetImagePath(path))
+                }
+            }
+        }
+
     // Solo muestra el diálogo si openDialog es true.
     if (openDialog) {
+
+        println("imagePath: " + imagePath)
         Dialog (
             // Si se cierra el diálogo tocando fuera o atrás, se envía evento CloseDialog.
             onDismissRequest = { onEvent(Event.CloseDialog) },
@@ -297,6 +341,34 @@ fun EditDialog(openDialog: Boolean, text: String, onEvent: (Event)-> Unit){
                         */
 
                     )
+
+                    // Imagenes
+                    if(imagePathDialog != null) {
+                        val bitmap by remember(imagePathDialog) { mutableStateOf(BitmapFactory.decodeFile(imagePathDialog)) }
+
+                        bitmap?.let {
+                            Image(
+                                bitmap = it.asImageBitmap(),
+                                contentDescription = "Imagen de la nota",
+                                modifier = Modifier.size(150.dp)
+                                    .clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    } else {
+                        Text("Sin imagen seleccionada")
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row {
+                        Button(
+                            onClick = {imagePickerLauncher.launch("image/*")}
+                        ) {
+                            Text("Seleccionar Imagen")
+                        }
+                    }
+
                 }
 
                 // Box para colocar los botones en la parte inferior.
@@ -343,5 +415,41 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
 fun GreetingPreview() {
     CrudbasicoTheme {
         Greeting("Android")
+    }
+}
+
+private fun saveImageToInternalStorage(context: Context, uri: Uri): String? {
+
+    return try {
+        // Abrimos un InputStream a partir del Uri de la imagen.
+        // Si por alguna razón no se puede abrir, regresamos null.
+        val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+
+        // Generamos un nombre de archivo único usando la marca de tiempo actual.
+        val fileName = "note_${System.currentTimeMillis()}.jpg"
+
+        // Creamos un File dentro del directorio de archivos internos de la app.
+        // Este directorio es privado para la app (otras apps no pueden acceder)
+        val file = File(context.filesDir, fileName)
+
+
+        // Usamos 'use' para asegurarnos de cerrar los streams automáticamente
+        // una vez que termine el bloque.
+        inputStream.use { input ->
+            FileOutputStream(file).use { output ->
+                // Copiamos todos los bytes desde el InputStream (origen)
+                // hacia el FileOutputStream (destino).
+                input.copyTo(output)
+            }
+        }
+
+        // Devolvemos la ruta absoluta del archivo.
+        // Esta ruta es la que se guardará en Room (campo imagePath).
+        file.absolutePath // ← esto es lo que vas a guardar en Room
+    } catch (e: Exception) {
+        // En caso de cualquier excepción (I/O, permisos, etc.), la registramos
+        // y devolvemos null para indicar que algo salió mal.
+        e.printStackTrace()
+        null
     }
 }

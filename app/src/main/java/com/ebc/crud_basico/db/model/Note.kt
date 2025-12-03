@@ -16,6 +16,10 @@ data class Note(
     var text: String,
 
     @ColumnInfo(name = "update")
-    var update: Date?
+    var update: Date?,
+
+    // 👇 NUEVO CAMPO
+    @ColumnInfo(name = "image_path")
+    var imagePath: String? = null
 
 )

@@ -12,7 +12,7 @@ import com.ebc.crud_basico.db.model.Note
 // - version: versión de la BD (se incrementa cuando cambias el esquema).
 // - exportSchema: si es false, Room no genera un archivo de esquema (útil para evitar
 //   archivos extra en proyectos pequeños o de ejemplo).
-@Database(entities = [(Note::class)], version = 1, exportSchema = false)
+@Database(entities = [(Note::class)], version = 2, exportSchema = false)
 
 // @TypeConverters indica que esta BD usará la clase Converters para convertir tipos
 // que Room no puede guardar directamente (por ejemplo, Date <-> Long).

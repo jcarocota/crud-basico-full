@@ -1,6 +1,7 @@
 package com.ebc.crud_basico.ViewModels
 
 import android.app.Application
+import android.net.Uri
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -8,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ebc.crud_basico.core.ImagePathState
 import com.ebc.crud_basico.core.TextFieldState
 import com.ebc.crud_basico.db.NotesDatabase
 import com.ebc.crud_basico.db.model.Note
@@ -17,6 +19,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
 import java.util.Date
 
 // ViewModel que maneja el estado y la lógica de la pantalla de notas.
@@ -41,6 +45,9 @@ class NoteViewModel(application: Application): ViewModel() {
     private val _text = mutableStateOf(TextFieldState())
     val text: State<TextFieldState> = _text
 
+    private val _imagePath = mutableStateOf(ImagePathState())
+    val imagePath: State<ImagePathState> = _imagePath
+
 
     // LiveData con la lista de todas las notas almacenadas en la BD.
     // Se puede observar desde la UI (o desde un composable con observeAsState).
@@ -52,6 +59,8 @@ class NoteViewModel(application: Application): ViewModel() {
     // Guarda el id de la nota que actualmente se está editando.
     // Si es null, significa que estamos creando una nueva nota.
     private var currentId: Int? = null
+
+    var application: Application? = null
 
     // Bloque init: se ejecuta cuando se crea el ViewModel.
     init {
@@ -65,6 +74,8 @@ class NoteViewModel(application: Application): ViewModel() {
         // Cargamos todas las notas. Esto es un LiveData que se actualizará automáticamente
         // si cambian los datos en la base.
         all = repository.all()
+
+        this.application = application
     }
 
     // Carga una nota desde la BD dado su id.
@@ -81,12 +92,20 @@ class NoteViewModel(application: Application): ViewModel() {
                     _text.value = text.value.copy(
                         text = note.text
                     )
+
+                    _imagePath.value = imagePath.value.copy(
+                        path = note.imagePath
+                    )
                 }
             }else{
                 // Si id es null, significa que vamos a crear una nota nueva.
                 currentId = null
                 _text.value = text.value.copy(
                     text = "text" // valor por defecto inicial (podrías dejarlo vacío "")
+                )
+
+                _imagePath.value = imagePath.value.copy(
+                    path = null
                 )
             }
         }
@@ -106,10 +125,10 @@ class NoteViewModel(application: Application): ViewModel() {
                 // Si currentId NO es null, estamos editando una nota existente.
                 if(currentId != null){
                     // Actualiza la nota en la BD.
-                    repository.update(Note(currentId, text.value.text, Date()))
+                    repository.update(Note(currentId, text.value.text, Date(), imagePath.value.path))
                 }else{
                     // Si currentId es null, estamos creando una nueva nota.
-                    repository.insert(Note(null, text.value.text, Date()))
+                    repository.insert(Note(null, text.value.text, Date(), imagePath.value.path))
                 }
                 // Cierra el diálogo después de guardar.
                 openDialog = false
@@ -137,6 +156,11 @@ class NoteViewModel(application: Application): ViewModel() {
             is Event.Delete -> {
                 // Si el id no es null, elimina la nota.
                 event.id?.let { repository.delete(it) }
+            }
+            is Event.SetImagePath -> {
+                _imagePath.value = imagePath.value.copy(
+                    path = event.imagePath
+                )
             }
         }
     }
