@@ -13,12 +13,14 @@ import com.ebc.crud_basico.core.ImagePathState
 import com.ebc.crud_basico.core.TextFieldState
 import com.ebc.crud_basico.db.NotesDatabase
 import com.ebc.crud_basico.db.model.Note
+import com.ebc.crud_basico.network.ApiClient
 import com.ebc.crud_basico.repository.NotesRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Date
@@ -61,6 +63,8 @@ class NoteViewModel(application: Application): ViewModel() {
     private var currentId: Int? = null
 
     var application: Application? = null
+
+    private val api = ApiClient.geekQuoteApi
 
     // Bloque init: se ejecuta cuando se crea el ViewModel.
     init {
@@ -161,6 +165,22 @@ class NoteViewModel(application: Application): ViewModel() {
                 _imagePath.value = imagePath.value.copy(
                     path = event.imagePath
                 )
+            }
+            is Event.FireQuote -> {
+                coroutineScope.launch(Dispatchers.IO) {
+                    _eventFlow.emit(Event.FireQuote(fetchRandomQuote()))
+                }
+            }
+        }
+    }
+
+    private suspend fun fetchRandomQuote(): String {
+        return withContext(Dispatchers.IO) {
+            try {
+                api.getRandomQuote()
+            } catch (e: Exception) {
+                e.printStackTrace()
+                "Error obteniendo frase"
             }
         }
     }

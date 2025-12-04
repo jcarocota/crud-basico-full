@@ -29,4 +29,6 @@ sealed class Event {
     data class Load(val id: Int?): Event()
 
     data class SetImagePath(val imagePath: String?): Event()
+
+    data class FireQuote(val quote: String?): Event()
 }

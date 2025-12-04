@@ -17,9 +17,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,6 +29,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.rounded.Android
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material3.Button
@@ -184,6 +187,14 @@ fun CrudScreenSetup(viewModel: NoteViewModel) {
                 Event.OpenDialog -> TODO()
                 is Event.SetText -> TODO()
                 is Event.SetImagePath -> TODO()
+                is Event.FireQuote -> {
+                    // Cuando se reciba un evento Save, mostramos un Snackbar.
+                    scope.launch {
+                        snackbarHostState.showSnackbar(
+                            event.quote?: ""
+                        )
+                    }
+                }
             }
         }
     }
@@ -206,6 +217,7 @@ fun CrudScreenSetup(viewModel: NoteViewModel) {
         floatingActionButtonPosition = FabPosition.End,
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) {
+
         // Llamamos a la pantalla principal de CRUD, pasándole:
         // - lista de notas,
         // - estado de diálogo,
@@ -233,7 +245,24 @@ fun CrudScreen(
     imagePath: String?,
 ) {
     // Contenedor principal de la pantalla.
-    Box(modifier = Modifier.fillMaxSize().padding(20.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp)
+    ) {
+
+        Button(
+            onClick = {onEvent(Event.FireQuote(null))},
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Android,
+                contentDescription = "Frase geek motivacional"
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Frase geek motivacional")
+        }
+
         // Lista perezosa de notas (solo renderiza los elementos visibles).
         /*
         ListItem(
@@ -290,15 +319,29 @@ fun EditDialog(openDialog: Boolean, text: String, onEvent: (Event)-> Unit, image
     var imagePathDialog by remember { mutableStateOf<String?>(null) }
     imagePathDialog = imagePath
     val context = LocalContext.current
+
+    // Launcher que abrirá el selector de contenido (galería, archivos, etc.)
+    // y devolverá un Uri cuando el usuario elija una imagen.
     val imagePickerLauncher =
         rememberLauncherForActivityResult(
+            // Contract: le decimos qué tipo de contenido queremos obtener.
+            // GetContent → abre un picker para seleccionar un archivo (imagen en este caso).
             contract = ActivityResultContracts.GetContent()
-        ) { uri: Uri? ->
+        ) {
+            // Este bloque es el callback que se ejecuta cuando el usuario
+            // termina de seleccionar (o cancela).
+            // 'uri' será null si el usuario canceló.
+            uri: Uri? ->
             uri?.let {
+                // Si sí hay Uri, intentamos guardar la imagen en el almacenamiento interno
+                // y obtenemos la ruta absoluta del archivo.
                 val path = saveImageToInternalStorage(context, it)
                 if (path != null) {
+                    // Guardamos la ruta en el estado local del diálogo (para mostrar preview, etc.)
                     imagePathDialog = path
 
+                    // Disparamos un evento hacia afuera para que el ViewModel / lógica
+                    // sepa que la nota ahora tiene esta ruta de imagen.
                     onEvent(Event.SetImagePath(path))
                 }
             }
